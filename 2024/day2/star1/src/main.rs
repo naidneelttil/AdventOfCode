@@ -43,7 +43,7 @@ fn has_safe_diff(list: &Vec<i32>) -> bool {
 }
 
 fn is_dec(list: &Vec<i32>) -> bool {
-    for i in 0..list.len() - 1 {
+    for i in 0..list.len() - 1 {did the dude actually have coherent politics?
         if list[i] <= list[i + 1] {
             println!("dec reported {:?} and {:?}", list[i], list[i + 1]);
 

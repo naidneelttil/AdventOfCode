@@ -1,10 +1,5 @@
-use std::collections::HashMap;
+use std::cmp::Ordering;
 use std::io;
-
-#[derive(Debug)]
-struct Manual {
-    pages: HashMap<Vec<i32>, bool>,
-}
 
 #[derive(Debug)]
 struct Rule {
@@ -14,22 +9,11 @@ struct Rule {
 
 impl Rule {
     fn apply(&self, data: &Vec<i32>) -> bool {
-        let mut idx: usize = 0;
-        let mut found_base: bool = false;
-        let mut found_before: bool = false;
+        let idx: usize;
+        (idx, _) = self.get_idxs(data);
+        let found_base_before = self.has_base_and_before(data);
 
-        for i in 0..data.len() {
-            if data[i] == self.base {
-                idx = i;
-                found_base = true;
-            }
-
-            if data[i] == self.before {
-                found_before = true;
-            }
-        }
-
-        if !(found_base && found_before) {
+        if !(found_base_before) {
             return true;
         }
 
@@ -41,15 +25,46 @@ impl Rule {
 
         false
     }
+
+    fn has_base_and_before(&self, data: &Vec<i32>) -> bool {
+        let mut found_base: bool = false;
+        let mut found_before: bool = false;
+
+        for i in 0..data.len() {
+            if data[i] == self.base {
+                found_base = true;
+            }
+
+            if data[i] == self.before {
+                found_before = true;
+            }
+        }
+
+        return found_base && found_before;
+    }
+
+    fn get_idxs(&self, data: &Vec<i32>) -> (usize, usize) {
+        let mut idx: usize = 0;
+        let mut idx2: usize = 0;
+        for i in 0..data.len() {
+            if data[i] == self.base {
+                idx = i;
+            }
+
+            if data[i] == self.before {
+                idx2 = i;
+            }
+        }
+
+        return (idx, idx2);
+    }
 }
 
 fn main() {
     //   let mut line = String::new();
     let mut readpages: bool = false;
     let mut rules: Vec<Rule> = Vec::new();
-    let mut manual: Manual = Manual {
-        pages: HashMap::new(),
-    };
+    let mut manuals: Vec<Vec<i32>> = Vec::new();
 
     loop {
         let mut line = String::new();
@@ -81,44 +96,134 @@ fn main() {
                         i32_nums.push(nums[i].parse().unwrap());
                     }
 
-                    manual.pages.insert(i32_nums, true);
+                    manuals.push(i32_nums);
                 }
             }
         };
     }
 
-    println!("printing out the rules {:?}", rules);
-    println!("printing out the manual {:?}", manual);
+    println!("1 printing out the rules {:?}", rules);
+    println!("1 printing out the manual {:?}", manuals);
 
-    for i in 0..rules.len() {
-        for (pages, is_valid) in manual.pages.iter_mut() {
-            println!("the rule is {:?}", rules[i]);
-            println!("the applied to page is {:?}", pages);
+    // get a vec of is valid
+    let mut is_valid: Vec<bool> = Vec::new();
+    for i in 0..manuals.len() {
+        let mut bool_vec: bool = true;
+        for rule in rules.iter() {
+            bool_vec = rule.apply(&manuals[i]) && bool_vec;
+        }
+        is_valid.push(bool_vec);
+    }
 
-            println!(
-                "the result of the rule applied is {}",
-                rules[i].apply(pages)
-            );
-            *is_valid = *is_valid && rules[i].apply(pages);
+    for i in 0..manuals.len() {
+        println!("manual {} {:?}", i, manuals[i]);
+    }
+
+    /*  nightly code
+        manuals
+            .extract_if(|x| validate(rules, x))
+            .collect::<Vec<_>>();
+    */
+    let mut i = 0;
+    while i < manuals.len() {
+        if validate(&rules, &mut manuals[i]) {
+            let val = manuals.remove(i);
+            // your code here
+        } else {
+            i += 1;
         }
     }
 
-    println!("printing out the manual {:?}", manual);
+    println!("2printing out the manual {:?}", manuals);
+
+    //mutate(&mut manuals, &rules);
+
+    for manual in manuals.iter_mut() {
+        //let vecCopy: Vec<i32> = manuals[i].clone();
+        manual.sort_by(|a, b| cmp(*a, *b, &rules));
+    }
+    /////// debugging //////////////////////////
+    println!("3printing out the manual {:?}", manuals);
+    let mut is_valid: Vec<bool> = Vec::new();
+    for i in 0..manuals.len() {
+        let mut bool_vec: bool = true;
+        for rule in rules.iter() {
+            bool_vec = rule.apply(&manuals[i]) && bool_vec;
+        }
+        is_valid.push(bool_vec);
+    }
+    println!("2printing out the is valid vec {:?}", is_valid);
+    //////////////////////////////////////////////
 
     let mut result: i32 = 0;
-    for (pages, is_valid) in manual.pages.iter_mut() {
-        if *is_valid {
-            result += pages[pages.len() / 2];
-        }
+
+    for manual in manuals {
+        result += manual[manual.len() / 2];
     }
 
-    println!("result is {}", result);
+    println!("this is the result: {}", result);
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
+fn validate(rules: &Vec<Rule>, manual: &Vec<i32>) -> bool {
+    let mut ret: bool = true;
+    for rule in rules {
+        ret = ret && rule.apply(manual);
+    }
+    ret
+}
 
-    #[test]
-    fn first_test() {}
+fn cmp(b: i32, a: i32, rules: &Vec<Rule>) -> Ordering {
+    let mut idx_base: usize;
+    let mut idx_before: usize;
+
+    for rule in rules {
+        if rule.before == a && rule.base == b {
+            return Ordering::Equal;
+        }
+        if rule.before == b && rule.base == a {
+            return Ordering::Less;
+        }
+    }
+    return Ordering::Equal;
+}
+
+fn mutate(manuals: &mut Vec<Vec<i32>>, rules: &Vec<Rule>) {
+    //let mut change: Vec<i32> = manuals[1].clone();
+    let mut idx_base: usize;
+    let mut idx_before: usize;
+    for vec in manuals {
+        for i in 0..rules.len() {
+            // if the rule doesn't work on the vec, then modify
+            if !rules[i].apply(vec) {
+                (idx_base, idx_before) = rules[i].get_idxs(vec);
+                let removed: i32 = vec.remove(idx_before);
+                // vec.insert(idx_before, -1);
+                let mut j: usize = 0;
+                let mut valid: bool = true;
+
+                while j < idx_base {
+                    vec.insert(j, removed);
+
+                    println!("this is the manual mutated {:?}", vec);
+                    for k in 0..i + 1 {
+                        valid = valid && rules[k].apply(vec);
+                    }
+
+                    if valid {
+                        println!("this is the valid manual mutated {:?}", vec);
+                        break;
+                    } else {
+                        vec.remove(j);
+                        valid = true;
+                    }
+                    j += 1;
+                }
+                // if idx_base == 0 {
+                //     vec.insert(0, removed);
+                // } else {
+                //     vec.insert(idx_base - 1, removed);
+                // }
+            }
+        }
+    }
 }
